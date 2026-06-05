@@ -1628,6 +1628,7 @@ const Chat = () => {
   const [intimacyGain, setIntimacyGain] = useState(0);
   const [showIntimacyToast, setShowIntimacyToast] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
   const [showMenu, setShowMenu] = useState(false);
   const [visibleParagraphs, setVisibleParagraphs] = useState([]); // 逐步显示的段落索引
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true); // 控制是否自动滚动
@@ -1791,17 +1792,23 @@ const Chat = () => {
         });
 
     try {
+      setStreamingText("");
       const { data, error } = await supabase.functions.invoke("nocode-friday-ai", {
-        body: { content: systemPrompt },
+        body: {
+          content: systemPrompt,
+          _onChunk: (fullText) => setStreamingText(fullText),
+        },
       });
 
       // 如果出错且不是重试，则重试一次
       if ((error || !data?.content) && !isRetry) {
         console.log("AI请求失败，正在重试...");
+        setStreamingText("");
         return generateScene(text, true);
       }
 
       setIsGenerating(false);
+      setStreamingText("");
 
       let proseArr = isChatMode ? [] : ["故事继续..."];
       let dialogueLine = null;
@@ -2465,27 +2472,33 @@ const Chat = () => {
           return null;
         })}
 
-        {/* AI generating indicator */}
+        {/* AI generating indicator / streaming text */}
         {isGenerating && (
           <div
             style={{
               padding: "16px 24px",
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
               animation: "fadeIn 0.3s ease both",
             }}
           >
-            <Loader
-              size={14}
-              style={{ color: "rgba(232,168,124,0.6)", animation: "spin 1s linear infinite" }}
-            />
-            <span
-              className="font-sans italic"
-              style={{ color: "rgba(232,168,124,0.5)", fontSize: "13px" }}
-            >
-              正在书写你的故事...
-            </span>
+            {streamingText ? (
+              <div style={{ color: "rgba(245,240,235,0.85)", fontSize: "14px", lineHeight: "1.8" }}>
+                {streamingText}
+                <span style={{ animation: "blink 1s infinite", marginLeft: "2px" }}>▌</span>
+              </div>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <Loader
+                  size={14}
+                  style={{ color: "rgba(232,168,124,0.6)", animation: "spin 1s linear infinite" }}
+                />
+                <span
+                  className="font-sans italic"
+                  style={{ color: "rgba(232,168,124,0.5)", fontSize: "13px" }}
+                >
+                  正在构思...
+                </span>
+              </div>
+            )}
           </div>
         )}
 

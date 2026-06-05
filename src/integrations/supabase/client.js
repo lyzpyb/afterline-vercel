@@ -1,8 +1,64 @@
-// 替代 Supabase client — 直接调用 Vercel Serverless Function
+// 替代 Supabase client — 直接调用 Vercel Serverless Function（支持流式）
 
 /**
- * 模拟 supabase.functions.invoke 的接口
- * 返回格式与 Supabase 一致: { data: { content: "..." }, error: null }
+ * 流式调用 AI API — 实时收集 SSE 数据流
+ * @param {string} prompt - 用户 prompt
+ * @param {function} onChunk - 每收到一块数据时回调 (chunk: string) => void
+ * @returns {Promise<{data: {content: string}, error: null} | {data: null, error: object}>}
+ */
+async function invokeAIStream(prompt, onChunk) {
+  try {
+    const resp = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: prompt, stream: true }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: resp.statusText }));
+      return { data: null, error: err };
+    }
+
+    // 读取 SSE 流
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let fullContent = "";
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop(); // 保留不完整的行
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const data = line.slice(6).trim();
+        if (data === "[DONE]") continue;
+
+        try {
+          const parsed = JSON.parse(data);
+          const delta = parsed.choices?.[0]?.delta?.content;
+          if (delta) {
+            fullContent += delta;
+            if (onChunk) onChunk(fullContent);
+          }
+        } catch {
+          // 非 JSON 行，跳过
+        }
+      }
+    }
+
+    return { data: { content: fullContent }, error: null };
+  } catch (err) {
+    return { data: null, error: { message: err.message } };
+  }
+}
+
+/**
+ * 非流式调用（兼容旧接口）
  */
 async function invokeAI(prompt) {
   try {
@@ -29,7 +85,7 @@ export const supabase = {
   functions: {
     invoke: async (fnName, { body }) => {
       if (fnName === "nocode-friday-ai") {
-        return invokeAI(body.content);
+        return invokeAIStream(body.content, body._onChunk);
       }
       return { data: null, error: { message: `未实现的函数: ${fnName}` } };
     },

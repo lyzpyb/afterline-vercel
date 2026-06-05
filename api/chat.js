@@ -30,7 +30,7 @@ export default async function handler(req, res) {
   }
 
   const payload = {
-    model: "mimo-v2.5",
+    model: "mimo-v2.5-pro",
     messages: [{ role: "user", content }],
     stream: !!stream,
     thinking: { type: "disabled" },
