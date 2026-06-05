@@ -1796,18 +1796,7 @@ const Chat = () => {
       const { data, error } = await supabase.functions.invoke("nocode-friday-ai", {
         body: {
           content: systemPrompt,
-          _onChunk: (fullText) => {
-            // streaming 时只提取纯叙事文本（过滤标记、选项、元数据）
-            const cleaned = fullText
-              .replace(/<<<VISUAL_META>>>[\s\S]*?<<<END_VISUAL_META>>>/g, "")
-              .replace(/^\s*\[[A-Z]\].*$/gm, "")  // 去掉 [A] [B] 选项行
-              .replace(/^\s*【.*$/gm, "")  // 去掉 【提示】行
-              .replace(/^\s*>>>.*$/gm, "")  // 去掉 >>> 标记行
-              .replace(/^\s*---+\s*$/gm, "")  // 去掉分隔线
-              .replace(/^\s*###.*$/gm, "")  // 去掉 markdown 标题
-              .trim();
-            setStreamingText(cleaned);
-          },
+          _onChunk: () => {}, // 不显示原始文本
         },
       });
 
@@ -2483,33 +2472,29 @@ const Chat = () => {
           return null;
         })}
 
-        {/* AI generating indicator / streaming text */}
+        {/* AI generating indicator */}
         {isGenerating && (
           <div
             style={{
               padding: "16px 24px",
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
               animation: "fadeIn 0.3s ease both",
             }}
           >
-            {streamingText ? (
-              <div style={{ color: "rgba(245,240,235,0.85)", fontSize: "14px", lineHeight: "1.8" }}>
-                {streamingText}
-                <span style={{ animation: "blink 1s infinite", marginLeft: "2px" }}>▌</span>
-              </div>
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <Loader
-                  size={14}
-                  style={{ color: "rgba(232,168,124,0.6)", animation: "spin 1s linear infinite" }}
-                />
-                <span
-                  className="font-sans italic"
-                  style={{ color: "rgba(232,168,124,0.5)", fontSize: "13px" }}
-                >
-                  正在构思...
-                </span>
-              </div>
-            )}
+            <div style={{ display: "flex", gap: "3px" }}>
+              <span style={{ color: "rgba(232,168,124,0.8)", fontSize: "16px", animation: "dotPulse 1.4s ease-in-out infinite" }}>笔</span>
+              <span style={{ color: "rgba(232,168,124,0.6)", fontSize: "16px", animation: "dotPulse 1.4s ease-in-out 0.2s infinite" }}>墨</span>
+              <span style={{ color: "rgba(232,168,124,0.4)", fontSize: "16px", animation: "dotPulse 1.4s ease-in-out 0.4s infinite" }}>纸</span>
+            </div>
+            <span
+              className="font-sans italic"
+              style={{ color: "rgba(232,168,124,0.5)", fontSize: "13px" }}
+            >
+              正在书写你的故事
+              <span style={{ animation: "blink 1s infinite" }}>...</span>
+            </span>
           </div>
         )}
 
