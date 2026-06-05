@@ -1796,7 +1796,18 @@ const Chat = () => {
       const { data, error } = await supabase.functions.invoke("nocode-friday-ai", {
         body: {
           content: systemPrompt,
-          _onChunk: (fullText) => setStreamingText(fullText),
+          _onChunk: (fullText) => {
+            // streaming 时只提取纯叙事文本（过滤标记、选项、元数据）
+            const cleaned = fullText
+              .replace(/<<<VISUAL_META>>>[\s\S]*?<<<END_VISUAL_META>>>/g, "")
+              .replace(/^\s*\[[A-Z]\].*$/gm, "")  // 去掉 [A] [B] 选项行
+              .replace(/^\s*【.*$/gm, "")  // 去掉 【提示】行
+              .replace(/^\s*>>>.*$/gm, "")  // 去掉 >>> 标记行
+              .replace(/^\s*---+\s*$/gm, "")  // 去掉分隔线
+              .replace(/^\s*###.*$/gm, "")  // 去掉 markdown 标题
+              .trim();
+            setStreamingText(cleaned);
+          },
         },
       });
 
